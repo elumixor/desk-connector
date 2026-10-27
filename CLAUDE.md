@@ -1,0 +1,3 @@
+# @desk/connector
+
+The connector protocol, consumed as source via `github:elumixor/desk-connector#v<version>` (never published to npm). `src/index.ts` holds the `Connector` a connector repo default-exports, the `Host` it is handed at runtime, and small helpers (`tool`, `ok`, `problemsOf`, `startOrder`); `src/testing.ts` is an in-memory `Host` for connector tests. Keep it minimal and dependency-free apart from zod: a field belongs here only when a connector actually uses it. A change bumps `version` and gets a `v*` tag, since connectors pin the tag. `bun test`, `bun run typecheck`, `bun run lint`.

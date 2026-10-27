@@ -1,0 +1,26 @@
+{
+  "name": "@desk/connector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The connector protocol: what a desk connector exposes (status, events, tools, verified sends) and the host interface it is handed at runtime.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts",
+    "./tsconfig.json": "./tsconfig.base.json",
+    "./biome.json": "./biome.base.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "biome lint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.4",
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
