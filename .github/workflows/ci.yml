@@ -1,0 +1,10 @@
+name: ci
+
+# lib.yml is desk-infra's, copied here because a public repo cannot call a private repo's workflows.
+on:
+  push:
+  pull_request:
+
+jobs:
+  lib:
+    uses: ./.github/workflows/lib.yml

@@ -1,0 +1,38 @@
+# Copied from elumixor/desk-infra/.github/workflows/lib.yml by its scripts/sync-workflows.ts; edit it there.
+# A desk library (core, the connectors): install, lint, types, tests. Each step runs when package.json has
+# the script: `lint`, `check` or `typecheck`, `test`.
+#
+#   jobs:
+#     lib:
+#       uses: elumixor/desk-infra/.github/workflows/lib.yml@main
+name: lib
+
+on:
+  workflow_call:
+    inputs:
+      bun-version:
+        type: string
+        default: "1.3.5"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
+      - id: has
+        run: |
+          has() { jq -e --arg s "$1" '.scripts[$s]' package.json > /dev/null; }
+          for s in lint check typecheck test; do has "$s" && echo "$s=true" || echo "$s=false"; done >> "$GITHUB_OUTPUT"
+      - run: bun install --frozen-lockfile
+      - if: steps.has.outputs.lint == 'true'
+        run: bun run lint
+      - if: steps.has.outputs.check == 'true'
+        run: bun run check
+      - if: steps.has.outputs.typecheck == 'true'
+        run: bun run typecheck
+      - if: steps.has.outputs.test == 'true'
+        run: bun run test
