@@ -16,6 +16,7 @@ export interface TestHost extends Host {
   readonly raised: Map<string, Problem & { id: string; open: boolean }>;
   readonly callbacks: Map<string, OAuthFinish>;
   readonly settings: Record<string, string | undefined>;
+  readonly completions: Parameters<Host["complete"]>[0][];
 }
 
 export interface TestHostOptions {
@@ -25,6 +26,8 @@ export interface TestHostOptions {
   readonly google?: { readonly id: string; readonly secret: string; readonly callback?: string };
   readonly origin?: string;
   readonly db?: Database;
+  /** The model's answer to every completion; without it a completion throws, as on a host with no model. */
+  readonly complete?: (request: Parameters<Host["complete"]>[0]) => string;
 }
 
 const quiet: Logger = { debug() {}, info() {}, warn() {}, error() {} };
@@ -86,6 +89,12 @@ export function testHost(opts: TestHostOptions = {}): TestHost {
     record: (entry) => void host.recorded.push(entry),
     archived: [],
     archive: (item) => void host.archived.push(item),
+    completions: [],
+    complete: async (request) => {
+      host.completions.push(request);
+      if (!opts.complete) throw new Error(`${name}: no model in this test host`);
+      return opts.complete(request);
+    },
   };
   return host;
 }

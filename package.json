@@ -1,6 +1,6 @@
 {
   "name": "@desk/connector",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "The connector protocol: what a desk connector exposes (status, events, tools, verified sends) and the host interface it is handed at runtime.",

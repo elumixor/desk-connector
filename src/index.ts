@@ -170,6 +170,16 @@ export interface Host {
   record(entry: { readonly action: "sent"; readonly text: string; readonly by?: string; readonly link?: string }): void;
   /** Text the host's search should find later (a mail sent or received). */
   archive(item: { readonly source: string; readonly id: string; readonly title: string; readonly body: string; readonly at?: number }): void;
+  /** One completion from the host's small fast model, billed and logged by the host under `what`; throws when it has none. */
+  complete(request: CompletionRequest): Promise<string>;
+}
+
+export interface CompletionRequest {
+  readonly system: string;
+  readonly prompt: string;
+  readonly maxTokens: number;
+  /** What the completion is for, as the host's spending log names it. */
+  readonly what: string;
 }
 
 /** What `<host> <connector> …` is handed: the host's API (where the connector runs) and the terminal. */
