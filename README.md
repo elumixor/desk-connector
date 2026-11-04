@@ -1,50 +1,63 @@
 # @desk/connector
 
-The protocol desk connectors are written against. A connector is a repository (desk-email,
-desk-telegram, desk-linkedin, desk-whatsapp, desk-browser) whose `index.ts` default-exports a
-`Connector`. It imports nothing from the host that runs it, only this package. pai is the host
-today: it clones connectors by git URL, imports them at runtime and hands each one a `Host`.
+The protocol and base class desk connectors are written against. The connectors live in
+[`elumixor/desk-connectors`](https://github.com/elumixor/desk-connectors), each a directory whose
+`index.ts` default-exports an instance of a class extending `BaseConnector`. A connector imports nothing
+from the host that runs it, only this package. pai is the host today: it clones that repository, imports
+the connectors its config names and hands each one a `Host`.
 
 ```sh
-bun add github:elumixor/desk-connector#v0.1.0
+bun add github:elumixor/desk-connector#v0.3.0
 ```
 
 ## A connector
 
 ```ts
-import { defineConnector, ok, tool, z } from "@desk/connector";
+import { BaseConnector, ok, tool, z } from "@desk/connector";
 
-export default defineConnector({
-  name: "mail",
-  title: "Mail",
-  description: "reads and sends mail",
-  status: (host) => (host.store.get("token") ? { state: "signed_in", detail: "me@example.com" } : { state: "signed_out", fix: { label: "Connect", url: host.http.url(`${host.http.base}/connect`) } }),
-  send: async ({ to, text }, host) => ({ outcome: "unverified" }),
-  events: [{ kind: "mail.new", description: "a new message (from, subject)" }],
-  tools: [tool("mail_search", "Search the mailbox.", { query: z.string() }, async ({ query }, call) => ok({ query, by: call.agent }))],
-  instructions: "Mail: mail_search finds messages…",
-  start: (host) => host.log.info("started"),
-});
+class MailConnector extends BaseConnector {
+  readonly name = "mail";
+  readonly title = "Mail";
+  readonly description = "reads and sends mail";
+  readonly icon = "icon.svg";
+  readonly events = [{ kind: "mail.new", title: "New mail", description: "a new message (from, subject)" }];
+  readonly instructions = "Mail: mail_search finds messages…";
+  readonly tools = [tool("mail_search", "Search the mailbox.", { query: z.string() }, async ({ query }, call) => ok({ query, by: call.agent }))];
+
+  protected check() {
+    return this.host.store.get("token")
+      ? { state: "signed_in" as const, detail: "me@example.com" }
+      : { state: "signed_out" as const, fix: { label: "Connect", url: this.host.http.url(`${this.host.http.base}/connect`) } };
+  }
+
+  override start() {
+    this.host.log.info("started");
+  }
+}
+
+export default new MailConnector();
 ```
 
-| field | what |
+| member | what |
 |---|---|
-| `name`, `title`, `description` | how the host lists it; `name` is lowercase |
-| `kind` | `connector` (default): a signed-in channel, must have `status`. `capability`: something other connectors use through `api` (the browser) |
-| `status(host)` | `signed_in` / `signed_out` / `broken`, a `detail` (who it is signed in as, or what is wrong) and a `fix` link. Asked even when the connector never started |
-| `send(message, host)` | a message out, read back out of the channel before answering: `verified` (it is there), `unverified` (it may be there: never send again), `not_sent` (nothing left: safe to retry) |
-| `events` | the kinds it emits with `host.emit` |
+| `name`, `title`, `description`, `icon` | how the host lists it; `name` is lowercase, `icon` a square image file next to `index.ts` |
+| `kind` | `connector` (default): a signed-in channel. `capability`: something other connectors use through `api` (the browser) |
+| `check()` | `signed_in` / `signed_out` / `broken`, a `detail` (who it is signed in as, or what is wrong) and a `fix` link. Asked even when the connector never started. `status()` answers it unless the user turned the connector off |
+| `options` | what the user can set (kept in `host.store`), shown after the off switch every connector has; `settings` is the whole list |
+| `actions()` | what the user can do right now: open a page (`url`), run something (`run`), `danger` asks first |
+| `send(message)` | a message out, read back out of the channel before answering: `verified` (it is there), `unverified` (it may be there: never send again), `not_sent` (nothing left: safe to retry) |
+| `events` | the kinds it emits with `host.emit`: `kind`, a `title` a person reads, a `description` |
 | `tools`, `server` | MCP tool definitions (name, description, zod input shape, `run(args, call)`); the host serves them as one MCP server named `server` (default `name`). `call.agent` is who called |
 | `instructions` | a paragraph for the AI about the tools |
 | `requires`, `api` | other connectors started first; `host.use(name)` returns their `api` |
-| `settings`, `accounts` | what the user can set (kept in `host.store`), and multi-account consent links (mailboxes) |
+| `accounts` | multi-account consent links (mailboxes) |
 | `routes`, `mounts`, `ui` | http under `host.http.base` (`/m/<name>` on pai), extra path prefixes, a static directory under `<base>/ui/` |
-| `cli`, `commands`, `cliHere` | `<host> <name> …` and its help; `cliHere` lists subcommands run where the user is, not next to the host |
-| `enabled`, `start`, `stop`, `health` | lifecycle |
+| `cli`, `commands`, `cliHere` | `<host> <name> …` and its help; `cliHere` lists subcommands run where the user is, not next to the host. A command line runs with no host attached |
+| `enabled()`, `start()`, `stop()`, `health()` | lifecycle, overridden as needed: `enabled` follows the off switch, `health` follows `status` |
 
 ## The host
 
-What a connector gets at runtime, and all it gets:
+What a connector gets at runtime, and all it gets, as `this.host` once it is attached:
 
 | member | what |
 |---|---|
@@ -65,6 +78,7 @@ A connector's command line gets a `Cli`: its args, the host's API (`api`, `post`
 ## Helpers
 
 - `tool(name, description, shape, run)`: a tool with typed arguments; `ok(data)` / `failed(message)` results.
+- `json(data, status)`, `fail(error, status)`, `page(html, status)`: what routes answer with.
 - `problemsOf(x)`: what is wrong with a default export that claims to be a connector (the host refuses one with problems).
 - `startOrder(names, requiresOf)`: the order to start them in.
 - `@desk/connector/testing`: `testHost()`, an in-memory host that keeps what a connector emitted, recorded, archived and raised.

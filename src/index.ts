@@ -1,10 +1,11 @@
 /**
  * The connector protocol: what a connector (a signed-in outside channel — email, Telegram,
  * LinkedIn, WhatsApp — or a capability other connectors build on, like a browser) exposes, and
- * what the host that runs it hands it. A connector is its own repository whose `index.ts`
- * default-exports a `Connector`; it imports nothing from its host, only this package.
+ * what the host that runs it hands it. A connector is a directory of `elumixor/desk-connectors`
+ * whose `index.ts` default-exports an instance of a class extending `BaseConnector`; it imports
+ * nothing from its host, only this package.
  *
- * The host (pai today) installs connectors by git URL, imports them at runtime, gives each one a
+ * The host (pai today) clones that repository, imports the connectors it runs, gives each one a
  * `Host`, turns its `tools` into an MCP server for the AI, shows its `status` with the link that
  * fixes it, and calls `send`, which answers whether the message is really there.
  */
@@ -205,6 +206,8 @@ export interface Cli {
 
 export interface EventDef {
   readonly kind: string;
+  /** Its name as a person reads it: "New message". */
+  readonly title: string;
   readonly description: string;
 }
 
@@ -213,46 +216,68 @@ export interface SettingDef {
   readonly label: string;
   readonly hint?: string;
   readonly secret?: boolean;
-  /** `toggle` settings are "1" or ""; the rest free text. */
-  readonly type?: "text" | "toggle" | "number";
+  /** `toggle` settings are "1" or ""; `select` one of `options`; the rest free text. */
+  readonly type?: "text" | "toggle" | "number" | "select";
+  readonly options?: readonly string[];
 }
 
-export type Route = (req: Request, path: string, url: URL, host: Host) => Promise<Response | undefined> | Response | undefined;
-export type Mount = (req: Request, url: URL, host: Host) => Promise<Response | undefined> | Response | undefined;
+/** Something the user can do to a connector from the host's interface: open a page, or run something on the host. */
+export interface ConnectorAction {
+  readonly id: string;
+  readonly label: string;
+  /** A host path or an absolute URL to open. */
+  readonly url?: string;
+  /** Asks before it runs. */
+  readonly danger?: boolean;
+  /** Runs on the host; what it answers is shown to the user. */
+  readonly run?: () => Promise<string | void> | string | void;
+}
+
+export type Route = (req: Request, path: string, url: URL) => Promise<Response | undefined> | Response | undefined;
+export type Mount = (req: Request, url: URL) => Promise<Response | undefined> | Response | undefined;
 
 /**
- * `connector`: a signed-in outside channel (events in, tools out, sends verified by read-back), which must say its
- * `status`. `capability`: something other connectors build on (a browser), reached through its `api`.
+ * `connector`: a signed-in outside channel (events in, tools out, sends verified by read-back).
+ * `capability`: something other connectors build on (a browser), reached through its `api`.
  */
 export type Kind = "connector" | "capability";
 
+/** What the host sees. A connector gets all of it that is not specific to it from `BaseConnector`. */
 export interface Connector {
   readonly name: string;
   readonly title: string;
   readonly description: string;
-  /** Default `connector`. */
-  readonly kind?: Kind;
+  /** A square image, as a file relative to the connector's root. */
+  readonly icon: string;
+  readonly kind: Kind;
   /** Connectors this one builds on: they start first, and `host.use(name)` gives their `api`. */
   readonly requires?: readonly string[];
   /** What other connectors get from `host.use(this.name)`. */
   readonly api?: object;
-  /** Off means nothing of it reaches the AI and it is not started; default on. */
-  readonly enabled?: (host: Host) => boolean;
-  /** Asked whether or not it is enabled or started, so a connector that never started still says why. Required for `kind: "connector"`. */
-  readonly status?: (host: Host) => Promise<Status> | Status;
+  /** Hands it its host, once, before anything else is asked. A command line (`cli`) runs without one. */
+  attach(host: Host): void;
+  /** Off means nothing of it reaches the AI and it is not started. */
+  enabled(): boolean;
+  /** Asked whether or not it is enabled or started, so a connector that never started still says why. */
+  status(): Promise<Status> | Status;
+  health(): Promise<Health> | Health;
+  start(): Promise<void> | void;
+  stop(): Promise<void> | void;
+  /** What the user can do to it right now, beside `status.fix` and `accounts`. */
+  actions(): readonly ConnectorAction[];
+  /** What the user can set, edited into `host.store`. */
+  readonly settings: readonly SettingDef[];
   /** A message out, read back before it answers. */
-  readonly send?: (message: SendRequest, host: Host) => Promise<SendResult>;
+  readonly send?: (message: SendRequest) => Promise<SendResult>;
   readonly events?: readonly EventDef[];
   readonly tools?: readonly Tool<any>[];
   /** The MCP server name its tools are served under; default its name. */
   readonly server?: string;
   /** A paragraph for the AI: what the tools are and the rules for using them. */
   readonly instructions?: string;
-  /** What the user can set, edited into `host.store`. */
-  readonly settings?: readonly SettingDef[];
   /** Things connected one at a time with their own consent (mailboxes): what is connected, where to add or forget one (`{label}` is the name asked for). */
   readonly accounts?: {
-    readonly list: (host: Host) => readonly { readonly label: string; readonly detail: string }[];
+    readonly list: () => readonly { readonly label: string; readonly detail: string }[];
     readonly connectPath: string;
     readonly removePath: string;
     readonly hint: string;
@@ -268,22 +293,16 @@ export interface Connector {
   readonly commands?: readonly { readonly name: string; readonly description: string }[];
   /** Subcommands that run where the user is (they need its browser, its files) rather than next to the host; `""` is the bare command. */
   readonly cliHere?: readonly string[];
-  readonly start?: (host: Host) => Promise<void> | void;
-  readonly stop?: () => Promise<void> | void;
-  readonly health?: () => Promise<Health> | Health;
 }
-
-/** Typed identity: `export default defineConnector({ … })`. */
-export const defineConnector = <C extends Connector>(c: C): C => c;
 
 /** What is wrong with a default export that claims to be a connector; empty when it is one. */
 export function problemsOf(c: unknown): string[] {
   if (!c || typeof c !== "object") return ["the default export is not an object"];
   const x = c as Partial<Connector>;
   const out: string[] = [];
-  for (const key of ["name", "title", "description"] as const) if (typeof x[key] !== "string" || !x[key]) out.push(`${key} is missing`);
+  for (const key of ["name", "title", "description", "icon"] as const) if (typeof x[key] !== "string" || !x[key]) out.push(`${key} is missing`);
   if (x.name && !/^[a-z][a-z0-9-]*$/.test(x.name)) out.push(`name "${x.name}" is not lowercase letters, digits and dashes`);
-  if ((x.kind ?? "connector") === "connector" && typeof x.status !== "function") out.push("a connector needs status");
+  for (const key of ["attach", "enabled", "status", "health", "start", "stop", "actions"] as const) if (typeof x[key] !== "function") out.push(`${key} is missing: extend BaseConnector`);
   const names = new Set<string>();
   for (const t of x.tools ?? []) {
     if (!t?.name || typeof t.run !== "function") out.push("a tool needs a name and run");
@@ -308,3 +327,6 @@ export function startOrder(names: readonly string[], requiresOf: (name: string) 
   for (const name of names) visit(name, []);
   return out;
 }
+
+export * from "./base.ts";
+export * from "./http.ts";

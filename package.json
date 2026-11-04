@@ -1,9 +1,9 @@
 {
   "name": "@desk/connector",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "The connector protocol: what a desk connector exposes (status, events, tools, verified sends) and the host interface it is handed at runtime.",
+  "description": "The connector protocol and base class: what a desk connector exposes (status, events, tools, verified sends) and the host interface it is handed at runtime.",
   "exports": {
     ".": "./src/index.ts",
     "./testing": "./src/testing.ts",
@@ -12,8 +12,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
-    "lint": "biome lint .",
-    "test": "bun test"
+    "lint": "biome lint ."
   },
   "dependencies": {
     "zod": "^4.4.3"
