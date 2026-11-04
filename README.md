@@ -7,7 +7,7 @@ from the host that runs it, only this package. pai is the host today: it clones 
 the connectors its config names and hands each one a `Host`.
 
 ```sh
-bun add github:elumixor/desk-connector#v0.3.0
+bun add github:elumixor/desk-connector#v0.3.1
 ```
 
 ## A connector
