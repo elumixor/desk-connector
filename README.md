@@ -7,7 +7,7 @@ from the host that runs it, only this package. pai is the host today: it clones 
 the connectors its config names and hands each one a `Host`.
 
 ```sh
-bun add github:elumixor/desk-connector#v0.3.1
+bun add github:elumixor/desk-connector#v0.4.0
 ```
 
 ## A connector
@@ -44,7 +44,7 @@ export default new MailConnector();
 | `kind` | `connector` (default): a signed-in channel. `capability`: something other connectors use through `api` (the browser) |
 | `check()` | `signed_in` / `signed_out` / `broken`, a `detail` (who it is signed in as, or what is wrong) and a `fix` link. Asked even when the connector never started. `status()` answers it unless the user turned the connector off |
 | `options` | what the user can set (kept in `host.store`), shown after the off switch every connector has; `settings` is the whole list |
-| `actions()` | what the user can do right now: open a page (`url`), run something (`run`), `danger` asks first |
+| `actions()` | what the user can do right now: open a page (`url`), run something (`run`, answering a line or `{ message, thread }`), `danger` asks first |
 | `send(message)` | a message out, read back out of the channel before answering: `verified` (it is there), `unverified` (it may be there: never send again), `not_sent` (nothing left: safe to retry) |
 | `events` | the kinds it emits with `host.emit`: `kind`, a `title` a person reads, a `description` |
 | `tools`, `server` | MCP tool definitions (name, description, zod input shape, `run(args, call)`); the host serves them as one MCP server named `server` (default `name`). `call.agent` is who called |
@@ -71,6 +71,7 @@ What a connector gets at runtime, and all it gets, as `this.host` once it is att
 | `oauth` | the host's OAuth `client("google")` with its callback path, `state(payload, req)` for a signed state and its cookie, `onCallback(claim, finish)` |
 | `problems` | `raise` / `resolve` / `open` one item per title for what only the user can fix (a reconnect link) |
 | `record`, `archive` | an action for the user's log (`sent`), text for the host's search |
+| `startThread(request)` | a conversation with the host's AI that the user can open: an action hands it work it cannot do alone |
 
 A connector's command line gets a `Cli`: its args, the host's API (`api`, `post`, `fetch`), output
 (`out`, `spin`), `run` for another connector's command line and `ssh()` for the host machine.

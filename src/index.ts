@@ -171,6 +171,8 @@ export interface Host {
   record(entry: { readonly action: "sent"; readonly text: string; readonly by?: string; readonly link?: string }): void;
   /** Text the host's search should find later (a mail sent or received). */
   archive(item: { readonly source: string; readonly id: string; readonly title: string; readonly body: string; readonly at?: number }): void;
+  /** Starts a conversation with the host's AI on `text`, one the user can open and follow; answers its id. */
+  startThread(request: { readonly title: string; readonly text: string }): Promise<{ readonly id: string }>;
   /** One completion from the host's small fast model, billed and logged by the host under `what`; throws when it has none. */
   complete(request: CompletionRequest): Promise<string>;
 }
@@ -221,6 +223,12 @@ export interface SettingDef {
   readonly options?: readonly string[];
 }
 
+/** What running an action comes to: a line to show, and a thread it started for the user to open. */
+export interface ActionResult {
+  readonly message?: string;
+  readonly thread?: string;
+}
+
 /** Something the user can do to a connector from the host's interface: open a page, or run something on the host. */
 export interface ConnectorAction {
   readonly id: string;
@@ -230,7 +238,7 @@ export interface ConnectorAction {
   /** Asks before it runs. */
   readonly danger?: boolean;
   /** Runs on the host; what it answers is shown to the user. */
-  readonly run?: () => Promise<string | void> | string | void;
+  readonly run?: () => Promise<ActionResult | string | void> | ActionResult | string | void;
 }
 
 export type Route = (req: Request, path: string, url: URL) => Promise<Response | undefined> | Response | undefined;

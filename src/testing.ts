@@ -17,6 +17,7 @@ export interface TestHost extends Host {
   readonly callbacks: Map<string, OAuthFinish>;
   readonly settings: Record<string, string | undefined>;
   readonly completions: Parameters<Host["complete"]>[0][];
+  readonly threads: Parameters<Host["startThread"]>[0][];
 }
 
 export interface TestHostOptions {
@@ -89,6 +90,11 @@ export function testHost(opts: TestHostOptions = {}): TestHost {
     record: (entry) => void host.recorded.push(entry),
     archived: [],
     archive: (item) => void host.archived.push(item),
+    threads: [],
+    startThread: async (request) => {
+      host.threads.push(request);
+      return { id: String(host.threads.length) };
+    },
     completions: [],
     complete: async (request) => {
       host.completions.push(request);
