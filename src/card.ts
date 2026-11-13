@@ -5,8 +5,19 @@
  * that cannot draw cards shows `cardText(view)`.
  */
 
-/** Where a row's work stands; `idle` is nothing started yet, `pending` is started and waiting for something to go on (a machine to connect). */
-export type CardState = "idle" | "pending" | "running" | "succeeded" | "failed" | "interrupted" | "cancelled";
+/**
+ * Where a row's work stands; `idle` is nothing started yet, `pending` is started and waiting for something to go on (a
+ * machine to connect). `superseded` and `invalidated` are set by the host only, never by a connector: the row is
+ * closed (see `CardClosure`).
+ */
+export type CardState = "idle" | "pending" | "running" | "succeeded" | "failed" | "interrupted" | "cancelled" | CardClosure;
+
+/**
+ * How the host closes a row or a whole card: `superseded` when a newer card of the same connector has a row of the same
+ * `key`, `invalidated` when he invalidates the card. A closed row has no buttons (a press on it is refused), however the
+ * connector redraws it; a card whose every row is closed carries the closure as its own `state` and is drawn folded.
+ */
+export type CardClosure = "superseded" | "invalidated";
 
 /** A button on a card or on one of its rows. `url` opens a link instead of coming back as a press. */
 export interface CardButton {
@@ -27,6 +38,13 @@ export interface CardStep {
 
 export interface CardRow {
   readonly id: string;
+  /**
+   * What the row stands for beyond this card (`<project>:device`): when the connector posts a newer card with a row of
+   * the same key, the host closes this one as `superseded`. No key, never superseded.
+   */
+  readonly key?: string;
+  /** The card that superseded it (state `superseded`), set by the host. */
+  readonly supersededBy?: string;
   readonly title: string;
   readonly state?: CardState;
   /** The line under it: what is happening now, or what it will do. */
@@ -51,6 +69,10 @@ export interface CardView {
   readonly icon?: string;
   readonly rows?: readonly CardRow[];
   readonly buttons?: readonly CardButton[];
+  /** Set by the host, never by a connector: absent while the card stands, the closure once it is closed (then no buttons). */
+  readonly state?: CardClosure;
+  /** The newest card that superseded its rows (state `superseded`). */
+  readonly supersededBy?: string;
 }
 
 /** A press on a card's button, as the host hands it to the connector that posted the card. */
@@ -73,17 +95,37 @@ export interface Cards {
   get(id: string): { readonly agent: string; readonly view: CardView } | undefined;
 }
 
-const STATE: Record<CardState, string> = { idle: "not started", pending: "pending", running: "running", succeeded: "done", failed: "failed", interrupted: "interrupted", cancelled: "cancelled" };
+const STATE: Record<CardState, string> = {
+  idle: "not started",
+  pending: "pending",
+  running: "running",
+  succeeded: "done",
+  failed: "failed",
+  interrupted: "interrupted",
+  cancelled: "cancelled",
+  superseded: "superseded",
+  invalidated: "invalidated",
+};
+
+/** Whether the host closed this row (superseded or invalidated): nothing on it can be pressed any more. */
+export const isClosed = (row: CardRow) => row.state === "superseded" || row.state === "invalidated";
+
+/** The closure said in words: "superseded by #12", "invalidated". */
+export const closureText = (state: CardClosure, by?: string) => (state === "superseded" && by ? `superseded by #${by}` : state);
 
 /** The plain-text form of a card, for a client that cannot draw it. */
 export function cardText(view: CardView): string {
   const head = view.subtitle ? `${view.title}: ${view.subtitle}` : view.title;
-  const rows = (view.rows ?? []).map((r) => `${r.title}: ${r.message ?? STATE[r.state ?? "idle"]}${r.url ? ` (${r.url})` : ""}`);
+  if (view.state) return `${head} (${closureText(view.state, view.supersededBy)})`;
+  const rows = (view.rows ?? []).map((r) =>
+    isClosed(r) ? `${r.title}: ${closureText(r.state as CardClosure, r.supersededBy)}` : `${r.title}: ${r.message ?? STATE[r.state ?? "idle"]}${r.url ? ` (${r.url})` : ""}`,
+  );
   return [head, ...rows].join("\n");
 }
 
 /** Whether the card has a button `button` (on row `row`, or on the card itself), the one a press may name. */
 export function hasButton(view: CardView, button: string, row?: string): boolean {
+  if (view.state) return false;
   const buttons = row === undefined ? view.buttons : view.rows?.find((r) => r.id === row)?.buttons;
   return Boolean(buttons?.some((b) => b.id === button && !b.url));
 }

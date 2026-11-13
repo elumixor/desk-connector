@@ -82,12 +82,19 @@ A connector's command line gets a `Cli`: its args, the host's API (`api`, `post`
 ## Cards
 
 A card is a declarative `CardView` the host draws in the agent's chat: `title`, `subtitle`, `icon`, `rows` and
-`buttons`. A row has a `title`, a `state` (`idle`, `pending` (waiting on something outside, it starts by itself), `running`, `succeeded`, `failed`, `interrupted`, `cancelled`), a
+`buttons`. A row has a `title`, a `state` (`idle`, `pending` (waiting on something outside, it starts by itself), `running`, `succeeded`, `failed`, `interrupted`, `cancelled`; `superseded` and `invalidated` are the host's, below), a
 `message`, a `url`, a rail of `steps` with the current `step`, `startedAt`/`updatedAt` (the time it took), a `log`
 tail and its own `buttons`. A button is `{ id, label, icon?, primary?, url? }`: with `url` it is a link, otherwise a
 press comes back to the connector's `press`. Icons are lucide's kebab-case names. The card lives on the host, so it
 survives a reload with whatever the connector last drew; the connector keeps its own state keyed by the card's id.
 `cardText(view)` is the plain form for a client that cannot draw it; `hasButton(view, button, row)` what a press may name.
+
+The host closes rows, never the connector. A row with a `key` (`<project>:device`) is `superseded` when the same
+connector posts a newer card with a row of that key: its `state` becomes `superseded`, `supersededBy` names the newer
+card, its buttons go. He can invalidate any card: every row and the card become `invalidated`. A closure sticks
+through the connector's later redraws. Once every row is closed the card itself carries `state` (`superseded` with
+`supersededBy`, or `invalidated`) and has no buttons; a client draws it folded to one line. Absent `state` = open.
+A connector reads closures back from `cards.get(id)` (`isClosed(row)`) to stop following work nobody can see.
 
 ## Helpers
 
