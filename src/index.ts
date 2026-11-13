@@ -11,6 +11,7 @@
  */
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
+import type { CardPress, Cards } from "./card.ts";
 
 export { z };
 export type { Database };
@@ -175,6 +176,13 @@ export interface Host {
   startThread(request: { readonly title: string; readonly text: string }): Promise<{ readonly id: string }>;
   /** One completion from the host's small fast model, billed and logged by the host under `what`; throws when it has none. */
   complete(request: CompletionRequest): Promise<string>;
+  /** Cards in an agent's chat, posted and redrawn by this connector; presses come back to its `press`. */
+  readonly cards: Cards;
+  /**
+   * Tells an agent something: a turn now (it acts on it), or `quiet`, context for its next turn without waking it.
+   * `agent` is the host's name for it, as `call.agent` and `CardPress.agent` give it.
+   */
+  tell(agent: string, text: string, options?: { readonly quiet?: boolean }): void;
 }
 
 export interface CompletionRequest {
@@ -275,6 +283,8 @@ export interface Connector {
   actions(): readonly ConnectorAction[];
   /** What the user can set, edited into `host.store`. */
   readonly settings: readonly SettingDef[];
+  /** A press on a button of a card it posted (`host.cards`); a throw is shown on the card as the error. */
+  readonly press?: (press: CardPress) => Promise<void> | void;
   /** A message out, read back before it answers. */
   readonly send?: (message: SendRequest) => Promise<SendResult>;
   readonly events?: readonly EventDef[];
@@ -337,4 +347,5 @@ export function startOrder(names: readonly string[], requiresOf: (name: string) 
 }
 
 export * from "./base.ts";
+export * from "./card.ts";
 export * from "./http.ts";

@@ -6,7 +6,8 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Host, Logger, OAuthFinish, Problem } from "./index.ts";
+import type { CardView, Host, Logger, OAuthFinish, Problem } from "./index.ts";
+import { cardText } from "./card.ts";
 
 export interface TestHost extends Host {
   readonly emitted: { kind: string; payload: Record<string, unknown> }[];
@@ -18,6 +19,9 @@ export interface TestHost extends Host {
   readonly settings: Record<string, string | undefined>;
   readonly completions: Parameters<Host["complete"]>[0][];
   readonly threads: Parameters<Host["startThread"]>[0][];
+  /** Every card posted, by id: its agent, view and plain text as last drawn. */
+  readonly posted: Map<string, { agent: string; view: CardView; text: string }>;
+  readonly told: { agent: string; text: string; quiet: boolean }[];
 }
 
 export interface TestHostOptions {
@@ -95,6 +99,21 @@ export function testHost(opts: TestHostOptions = {}): TestHost {
       host.threads.push(request);
       return { id: String(host.threads.length) };
     },
+    posted: new Map(),
+    cards: {
+      post: ({ agent, view, text }) => {
+        const id = String(host.posted.size + 1);
+        host.posted.set(id, { agent, view, text: text ?? cardText(view) });
+        return id;
+      },
+      update: (id, view, text) => {
+        const card = host.posted.get(id);
+        if (card) host.posted.set(id, { ...card, view, text: text ?? cardText(view) });
+      },
+      get: (id) => host.posted.get(id),
+    },
+    told: [],
+    tell: (agent, text, options) => void host.told.push({ agent, text, quiet: Boolean(options?.quiet) }),
     completions: [],
     complete: async (request) => {
       host.completions.push(request);
