@@ -199,6 +199,8 @@ export interface ApprovedAction {
 export interface Approvals {
   /** True once, when `id` was issued for exactly `action` and not used yet; it is spent either way it matches. */
   consume(id: string, action: ApprovedAction): Promise<boolean>;
+  /** True when `id` was issued for exactly `action` and not used yet; spends nothing. Absent: a connector cannot check before it acts. */
+  check?(id: string, action: ApprovedAction): Promise<boolean>;
 }
 
 export interface CompletionRequest {
