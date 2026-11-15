@@ -183,6 +183,22 @@ export interface Host {
    * `agent` is the host's name for it, as `call.agent` and `CardPress.agent` give it.
    */
   tell(agent: string, text: string, options?: { readonly quiet?: boolean }): void;
+  /** Approvals a person gave for one exact action; absent on a host that issues none, which means no approval holds. */
+  readonly approvals?: Approvals;
+}
+
+/** What an approval is bound to: the connector, and the exact action it allows there. */
+export interface ApprovedAction {
+  readonly connector: string;
+  readonly site: string;
+  /** The action as the connector describes it, e.g. `click "Odeslat"`. */
+  readonly step: string;
+}
+
+/** Approvals the host issued on a person's yes to an ask: each single-use, bound to the action it named. */
+export interface Approvals {
+  /** True once, when `id` was issued for exactly `action` and not used yet; it is spent either way it matches. */
+  consume(id: string, action: ApprovedAction): Promise<boolean>;
 }
 
 export interface CompletionRequest {
