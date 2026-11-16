@@ -29,6 +29,15 @@ export interface CardButton {
   readonly url?: string;
 }
 
+/**
+ * A password field beside a row's buttons (sudo's on a box command): what he types goes with his press on that row as
+ * `CardPress.secret` and nowhere else. It is never part of the view, so it is not drawn back, stored or logged.
+ */
+export interface CardSecret {
+  /** The field's placeholder: "sudo password". */
+  readonly label: string;
+}
+
 /** One step of a row's rail. */
 export interface CardStep {
   readonly key: string;
@@ -60,6 +69,8 @@ export interface CardRow {
   /** The last lines of its log, folded behind a toggle. */
   readonly log?: readonly string[];
   readonly buttons?: readonly CardButton[];
+  /** A password field shown beside its buttons; its value comes with a press on the row (`CardPress.secret`). */
+  readonly secret?: CardSecret;
 }
 
 export interface CardView {
@@ -83,6 +94,11 @@ export interface CardPress {
   readonly row?: string;
   /** The agent whose chat the card is in. */
   readonly agent: string;
+  /**
+   * What he typed into the row's `secret` field, for this press only: a host passes it straight through (never into a
+   * log, an audit row, the card or storage), and the connector hands it to what needs it and keeps no copy.
+   */
+  readonly secret?: string;
 }
 
 /** What the host offers for cards: post one into an agent's chat, redraw it, read back what it shows. */
