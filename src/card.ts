@@ -63,6 +63,8 @@ export interface CardRow {
   /** The rail of steps and the one it is at (`step`, a step's key). */
   readonly steps?: readonly CardStep[];
   readonly step?: string;
+  /** How far its work is, 0..1, drawn as a bar while it runs (an estimate is fine). */
+  readonly progress?: number;
   /** When its work began and last changed (ISO time or epoch ms): the time it took is shown, ticking while pending or running. */
   readonly startedAt?: string | number;
   readonly updatedAt?: string | number;
